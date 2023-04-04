@@ -15,6 +15,7 @@ from geniusweb.inform.Settings import Settings
 from geniusweb.inform.YourTurn import YourTurn
 from geniusweb.issuevalue.Bid import Bid
 from geniusweb.issuevalue.Domain import Domain
+from geniusweb.issuevalue.Value import Value
 from geniusweb.party.Capabilities import Capabilities
 from geniusweb.party.DefaultParty import DefaultParty
 from geniusweb.profile.utilityspace.LinearAdditiveUtilitySpace import (
@@ -52,6 +53,14 @@ class TemplateAgent(DefaultParty):
         self.opponent_model: OpponentModel = None
         self.logger.log(logging.INFO, "party is initialized")
 
+        # New added fields:
+        self.all_bids: list = None              # all possible bids in the issue space (with utility above the reservation value)
+        self.reservation_value: float = None    # the worst deal we are willing to accept
+        self.last_offered_bid: Bid = None       # our previous offer
+        self.received_bids = []                 # stores all the bids we received
+        self.W: int = 300                       # the time window in AC_combi(MAX^W) (in number of rounds)
+        self.target_utility: float = None       # the utility we are aiming for when looking for a bid to offer
+
     def notifyChange(self, data: Inform):
         """MUST BE IMPLEMENTED
         This is the entry point of all interaction with your agent after is has been initialised.
@@ -79,6 +88,21 @@ class TemplateAgent(DefaultParty):
             )
             self.profile = profile_connection.getProfile()
             self.domain = self.profile.getDomain()
+
+            # -------------------------------------------
+            # Save the list of all possible bids:
+            self.all_bids = AllBidsList(self.domain)
+
+            # Save the reservation value:
+            reservation_bid = self.profile.getReservationBid()
+            if reservation_bid is not None:
+                self.reservation_value = float(self.profile.getUtility(reservation_bid))
+            else:
+                self.reservation_value = float(0)
+
+            # Keep only bids with utility that is higher or equal to the reservation value:
+            self.all_bids = list(filter(lambda b: (float(self.profile.getUtility(b)) >= self.reservation_value), self.all_bids))
+
             profile_connection.close()
 
         # ActionDone informs you of an action (an offer or an accept)
@@ -158,6 +182,9 @@ class TemplateAgent(DefaultParty):
             # set bid as last received
             self.last_received_bid = bid
 
+            # add bid to the list of received bids:
+            self.received_bids.append(bid)
+
     def my_turn(self):
         """This method is called when it is our turn. It should decide upon an action
         to perform and send this action to the opponent.
@@ -184,7 +211,7 @@ class TemplateAgent(DefaultParty):
             f.write(data)
 
     ###########################################################################################
-    ################################## Example methods below ##################################
+    ################################## OUR IMPLEMENTATION #####################################
     ###########################################################################################
 
     def accept_condition(self, bid: Bid) -> bool:
@@ -194,33 +221,137 @@ class TemplateAgent(DefaultParty):
         # progress of the negotiation session between 0 and 1 (1 is deadline)
         progress = self.progress.get(time() * 1000)
 
-        # very basic approach that accepts if the offer is valued above 0.7 and
-        # 95% of the time towards the deadline has passed
+        bid_utility = float(self.profile.getUtility(bid))
+        upcoming_bid_utility = float(self.profile.getUtility(self.find_bid_of_target_utility()))
+
+        # Accept the offer if *any* of the following conditions are respected:
         conditions = [
-            self.profile.getUtility(bid) > 0.8,
-            progress > 0.95,
+            # Received higher utility than our last proposed bid:
+            self.last_offered_bid is not None and bid_utility >= float(self.profile.getUtility(self.last_offered_bid)),
+
+            # Received higher utility than our upcoming bid:
+            self.last_offered_bid is not None and bid_utility >= upcoming_bid_utility,
+
+            # AC_combi(MAX ^ W) rule (active only when 75% of the time has passed):
+            progress > 0.75 and len(self.received_bids) > self.W and self.AC_combi_MAX_W(bid),
+
+            # Negotiation is close to an end:
+            progress >= 0.99
         ]
-        return all(conditions)
+
+        # + accept the bid only when it is above the reservation_value
+        return (bid_utility > self.reservation_value) and any(conditions)
+
+    def AC_combi_MAX_W(self, bid) -> bool:
+        bid_utility = float(self.profile.getUtility(bid))
+
+        # Get the max utility in the last W rounds of negotiation:
+
+        # [-(self.W + 1):-1] selects the last W+1 elements from the list and ignores the last one (not taking the current received bid into account)
+        utilities_in_time_window_W = list(map(lambda b: float(self.profile.getUtility(b)), self.received_bids[-(self.W + 1):-1]))
+        max_utility_in_time_window_W = max(utilities_in_time_window_W)
+
+        return bid_utility > max_utility_in_time_window_W
 
     def find_bid(self) -> Bid:
-        # compose a list of all possible bids
-        domain = self.profile.getDomain()
-        all_bids = AllBidsList(domain)
+        progress = self.progress.get(time() * 1000)
 
+        # Randomly pick the best possible bids until 25% of the time has passed
+        # We can't propose bids that the opponent likes because we don't know their preferences yet
+        if progress < 0.25:
+            return self.find_random_best_bid()
+
+        # If target_utility hasn't been initialized:
+        if self.target_utility is None:
+            self.target_utility = float(self.profile.getUtility(self.last_offered_bid))
+
+        # The most preferable bid based on the opponent model:
+        best_bid = self.find_bid_of_target_utility()
+
+        # Slowly concede if there is no bid or if the bid is the same as the last offered bid:
+        # TODO: change the conceding strategy: best_bid == self.last_offered_bid
+        # TODO: maybe tit for tat? concede if the opponent does (proposed a higher bid than ever: max received utility)
+        if (best_bid is None or best_bid == self.last_offered_bid) and self.target_utility > self.reservation_value:
+            # Decrease the target utility by 0.01:
+            self.target_utility = max(self.target_utility - 0.01, self.reservation_value)
+
+            # If the target utility is acceptable, try again with the changed utility:
+            if self.target_utility > self.reservation_value:
+                return self.find_bid()
+
+        # Couldn't find best bid:
+        if best_bid is None:
+            return self.find_random_best_bid()
+
+        self.last_offered_bid = best_bid
+        return best_bid
+
+    def find_random_best_bid(self):
+        """
+        <Code provided in the original template>
+        """
         best_bid_score = 0.0
         best_bid = None
 
         # take 500 attempts to find a bid according to a heuristic score
         for _ in range(500):
-            bid = all_bids.get(randint(0, all_bids.size() - 1))
+            bid = self.all_bids[randint(0, len(self.all_bids) - 1)]
             bid_score = self.score_bid(bid)
             if bid_score > best_bid_score:
                 best_bid_score, best_bid = bid_score, bid
 
+        self.last_offered_bid = best_bid
         return best_bid
 
+    def find_bid_of_target_utility(self):
+        best_bid = None
+        best_bid_utility = 0.0
+        best_bid_similarity = 0
+
+        # Iterate over all possible bids:
+        for bid in self.all_bids:
+            bid_utility = float(self.profile.getUtility(bid))
+
+            # Consider bids that have utility equal to the aspirational scoring value (or very close to it)
+            if abs(bid_utility-self.target_utility) > 0.05:
+                continue
+
+            # Similarity between the bid and the last received bid:
+            bid_similarity = self.similarity(bid, self.last_received_bid)
+
+            if bid_similarity == 0:
+                continue
+
+            # Choose the most similar bid:
+            if (bid_similarity > best_bid_similarity) or (bid_similarity == best_bid_similarity and bid_utility > best_bid_utility):
+                best_bid, best_bid_similarity, best_bid_utility = bid, bid_similarity, bid_utility
+
+        return best_bid
+
+    def similarity(self, bid1, bid2):
+        similarity: float = 0
+
+        # Iterate over all issues:
+        for issue_id, issue_estimator in self.opponent_model.issue_estimators.items():
+            value1: Value = bid1.getValue(issue_id)     # value of the issue in the 1st bid
+            value2: Value = bid2.getValue(issue_id)     # value of the issue in the 2nd bid
+
+            # The estimated weight for this issue in the opponent model:
+            issue_weight = float(issue_estimator.weight)
+
+            if value1 == value2:
+                values_similarity = 1.0
+            else:
+                values_similarity = 0.0
+
+            similarity += issue_weight * values_similarity
+
+        return similarity
+
     def score_bid(self, bid: Bid, alpha: float = 0.95, eps: float = 0.1) -> float:
-        """Calculate heuristic score for a bid
+        """
+        <Method provided in the original template>
+        Calculate heuristic score for a bid
 
         Args:
             bid (Bid): Bid to score
