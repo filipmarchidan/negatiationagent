@@ -37,6 +37,7 @@ class TemplateAgent(DefaultParty):
 
     def __init__(self):
         super().__init__()
+        self.preferred_utility : float = None
         self.logger: ReportToLogger = self.getReporter()
 
         self.domain: Domain = None
@@ -54,6 +55,7 @@ class TemplateAgent(DefaultParty):
         self.first_window_bids: [Bid] = []  # Keeps track of opponent's bids from first time window
         self.size_of_first_time_window = 0.5  # Defines the size of first time window of opponent's bids
         self.logger.log(logging.INFO, "party is initialized")
+        self.reservation_value: float = None
 
     def notifyChange(self, data: Inform):
         """MUST BE IMPLEMENTED
@@ -82,6 +84,13 @@ class TemplateAgent(DefaultParty):
             )
             self.profile = profile_connection.getProfile()
             self.domain = self.profile.getDomain()
+
+            reservation_bid = self.profile.getReservationBid()
+            if reservation_bid is not None:
+                self.reservation_value = float(self.profile.getUtility(reservation_bid))
+            else:
+                self.reservation_value = float(0)
+
             profile_connection.close()
 
         # ActionDone informs you of an action (an offer or an accept)
@@ -255,9 +264,10 @@ class TemplateAgent(DefaultParty):
             return False
 
         # TODO change equation if needed
-        return self.accept_time() or (self.accept_average(bid) and self.accept_next(bid))
+        return (self.profile.getUtility(bid) > self.reservation_value) and (self.accept_time() or (self.accept_average(bid) or self.accept_next(bid)))
 
     def find_bid(self) -> Bid:
+        progress = self.progress.get(time() * 1000)
         # compose a list of all possible bids
         domain = self.profile.getDomain()
         all_bids = AllBidsList(domain)
@@ -265,13 +275,28 @@ class TemplateAgent(DefaultParty):
         best_bid_score = 0.0
         best_bid = None
 
+        if progress > 0.4:
+
+            if self.preferred_utility is None:
+                self.preferred_utility = float(self.profile.getUtility(self.last_offered_bid))
+
+            if(best_bid is None or best_bid == self.last_offered_bid) and self.preferred_utility > self.reservation_value:
+
+                self.preferred_utility = max(self.preferred_utility - 0.01, self.reservation_value)
+
+                if self.preferred_utility > self.reservation_value:
+                    return self.find_bid()
+
+            self.last_offered_bid = best_bid
+            #return best_bid
         # take 500 attempts to find a bid according to a heuristic score
         for _ in range(500):
             bid = all_bids.get(randint(0, all_bids.size() - 1))
             bid_score = self.score_bid(bid)
-            if bid_score > best_bid_score:
+            if bid_score > best_bid_score and bid_score > self.reservation_value:
                 best_bid_score, best_bid = bid_score, bid
 
+        self.last_offered_bid = best_bid
         return best_bid
 
     def score_bid(self, bid: Bid, alpha: float = 0.95, eps: float = 0.1) -> float:
