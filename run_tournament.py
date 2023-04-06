@@ -25,28 +25,13 @@ tournament_settings = {
             "class": "agents.boulware_agent.boulware_agent.BoulwareAgent",
         },
         {
-            "class": "agents.conceder_agent.conceder_agent.ConcederAgent",
-        },
-        {
             "class": "agents.hardliner_agent.hardliner_agent.HardlinerAgent",
-        },
-        {
-            "class": "agents.linear_agent.linear_agent.LinearAgent",
-        },
-        {
-            "class": "agents.random_agent.random_agent.RandomAgent",
-        },
-        {
-            "class": "agents.stupid_agent.stupid_agent.StupidAgent",
         },
         {
             "class": "agents.CSE3210.agent2.agent2.Agent2",
         },
         {
             "class": "agents.CSE3210.agent3.agent3.Agent3",
-        },
-        {
-            "class": "agents.CSE3210.agent7.agent7.Agent7",
         },
         {
             "class": "agents.CSE3210.agent11.agent11.Agent11",
@@ -56,12 +41,6 @@ tournament_settings = {
         },
         {
             "class": "agents.CSE3210.agent18.agent18.Agent18",
-        },
-        {
-            "class": "agents.CSE3210.agent19.agent19.Agent19",
-        },
-        {
-            "class": "agents.CSE3210.agent22.agent22.Agent22",
         },
         {
             "class": "agents.CSE3210.agent24.agent24.Agent24",
@@ -82,13 +61,7 @@ tournament_settings = {
             "class": "agents.CSE3210.agent32.agent32.Agent32",
         },
         {
-            "class": "agents.CSE3210.agent33.agent33.Agent33",
-        },
-        {
             "class": "agents.CSE3210.agent41.agent41.Agent41",
-        },
-        {
-            "class": "agents.CSE3210.agent43.agent43.Agent43",
         },
         {
             "class": "agents.CSE3210.agent50.agent50.Agent50",
@@ -104,9 +77,6 @@ tournament_settings = {
         },
         {
             "class": "agents.CSE3210.agent61.agent61.Agent61",
-        },
-        {
-            "class": "agents.CSE3210.agent64.agent64.Agent64",
         },
         {
             "class": "agents.CSE3210.agent67.agent67.Agent67",
