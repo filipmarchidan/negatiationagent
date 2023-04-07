@@ -37,7 +37,7 @@ class TemplateAgent(DefaultParty):
 
     def __init__(self):
         super().__init__()
-        self.preferred_utility : float = None
+        self.preferred_utility: float = None
         self.logger: ReportToLogger = self.getReporter()
 
         self.domain: Domain = None
@@ -50,10 +50,11 @@ class TemplateAgent(DefaultParty):
         self.storage_dir: str = None
 
         self.last_received_bid: Bid = None  # Used in AcNext
-        self.last_offered_bid : Bid = None
+        self.last_offered_bid: Bid = None
+        self.all_bids_filtered = None
         self.opponent_model: OpponentModel = None
         self.first_window_bids: [Bid] = []  # Keeps track of opponent's bids from first time window
-        self.size_of_first_time_window = 0.5  # Defines the size of first time window of opponent's bids
+        self.size_of_first_time_window = 0.75  # Defines the size of first time window of opponent's bids
         self.logger.log(logging.INFO, "party is initialized")
         self.reservation_value: float = None
 
@@ -91,6 +92,10 @@ class TemplateAgent(DefaultParty):
             else:
                 self.reservation_value = float(0)
 
+            domain = self.profile.getDomain()
+            all_bids = AllBidsList(domain)
+            self.all_bids_filtered = list(
+                filter(lambda b: (float(self.profile.getUtility(b)) >= self.reservation_value), all_bids))
             profile_connection.close()
 
         # ActionDone informs you of an action (an offer or an accept)
@@ -173,7 +178,6 @@ class TemplateAgent(DefaultParty):
             if progress <= self.size_of_first_time_window:
                 self.first_window_bids.append(self.last_received_bid)
 
-
     def my_turn(self):
         """This method is called when it is our turn. It should decide upon an action
         to perform and send this action to the opponent.
@@ -223,21 +227,22 @@ class TemplateAgent(DefaultParty):
         alpha = 1
         beta = 0
         opp_bid_utility = self.profile.getUtility(opp_bid)
-        prev_bid_utility = self.profile.getUtility(self.last_offered_bid)
-        if alpha * opp_bid_utility + beta >= prev_bid_utility:
-            return True
+        if self.last_offered_bid is not None:
+            prev_bid_utility = self.profile.getUtility(self.last_offered_bid)
+            if alpha * opp_bid_utility + beta >= prev_bid_utility:
+                return True
         return False
 
     # Accept if round progress is at 95%
     def accept_time(self) -> bool:
-        time_const = 0.95
+        time_const = 0.99
         progress = self.progress.get(time() * 1000)
         if progress >= time_const:
             return True
         return False
 
     # Accept if the current opponent's bid utility is higher than the average utility seen in the first time window
-    def accept_average(self, opp_bid: Bid) -> bool:
+    def accept_max(self, opp_bid: Bid) -> bool:
         progress = self.progress.get(time() * 1000)
 
         if progress < self.size_of_first_time_window:
@@ -251,36 +256,38 @@ class TemplateAgent(DefaultParty):
     # It computes the average of utilities of opponent's bids that were received in the first time window
     # First time window is defined as follows: [0, self.size_of_first_time_window]
     def compute_utility_average_of_first_window(self) -> float:
-        average = 0
-        count = 0
+        current = 0
+        max = 0
         for opp_bid in self.first_window_bids:
-            average += self.profile.getUtility(opp_bid)
-            count += 1
-
-        return average / count
+            if current < self.profile.getUtility(opp_bid):
+                max = self.profile.getUtility(opp_bid)
+            else:
+                max = current
+        return max
 
     def accept_condition(self, bid: Bid) -> bool:
         if bid is None:
             return False
 
-        # TODO change equation if needed
-        return (self.profile.getUtility(bid) > self.reservation_value) and (self.accept_time() or (self.accept_average(bid) or self.accept_next(bid)))
+            # TODO change equation if needed
+        #print(self.profile.getUtility(bid), "bid utility")
+        print(self.reservation_value, "reservation value")
+        return (self.profile.getUtility(bid) > self.reservation_value) and (
+            (self.accept_time() or (self.accept_max(bid))) or self.accept_previous(bid) and self.accept_next(bid))
 
     def find_bid(self) -> Bid:
         progress = self.progress.get(time() * 1000)
         # compose a list of all possible bids
-        domain = self.profile.getDomain()
-        all_bids = AllBidsList(domain)
-
         best_bid_score = 0.0
         best_bid = None
 
-        if progress > 0.4:
+        if progress > 0.2:
 
             if self.preferred_utility is None:
                 self.preferred_utility = float(self.profile.getUtility(self.last_offered_bid))
 
-            if(best_bid is None or best_bid == self.last_offered_bid) and self.preferred_utility > self.reservation_value:
+            if (
+                    best_bid is None or best_bid == self.last_offered_bid) and self.preferred_utility > self.reservation_value:
 
                 self.preferred_utility = max(self.preferred_utility - 0.01, self.reservation_value)
 
@@ -288,10 +295,10 @@ class TemplateAgent(DefaultParty):
                     return self.find_bid()
 
             self.last_offered_bid = best_bid
-            #return best_bid
+            # return best_bid
         # take 500 attempts to find a bid according to a heuristic score
         for _ in range(500):
-            bid = all_bids.get(randint(0, all_bids.size() - 1))
+            bid = self.all_bids_filtered[(randint(0, len(self.all_bids_filtered) - 1))]
             bid_score = self.score_bid(bid)
             if bid_score > best_bid_score and bid_score > self.reservation_value:
                 best_bid_score, best_bid = bid_score, bid
