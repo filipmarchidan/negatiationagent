@@ -54,16 +54,18 @@ class TemplateAgent(DefaultParty):
         self.logger.log(logging.INFO, "party is initialized")
 
         # New added fields:
-        self.all_bids: list = None              # all possible bids in the issue space (with utility above the reservation value)
-        self.reservation_value: float = None    # the worst deal we are willing to accept
-        self.last_offered_bid: Bid = None       # our previous offer
-        self.received_bids = []                 # stores all the bids we received
-        self.W: int = 300                       # the time window in AC_combi(MAX^W) (in number of rounds)
-        self.target_utility: float = None       # the utility we are aiming for when looking for a bid to offer
+        self.all_bids: list[tuple[Bid, float]] = None   # all possible bids in the issue space (with utility above the reservation value)
+        self.reservation_value: float = None            # the worst deal we are willing to accept
+        self.last_offered_bid: Bid = None               # our previous offer
+        self.received_bids = []                         # stores all the bids we received
+        self.W: int = 300                               # the time window in AC_combi(MAX^W) (in number of rounds)
+        self.max_received_utility: float = None         # the maximum utility we received overall
+        self.target_utility: float = None               # the utility the agent is going for when preparing a bid offer
+        self.max_possible_utility: float = 1            # the max utility the agent can achieve in the domain space
 
     def notifyChange(self, data: Inform):
-        """MUST BE IMPLEMENTED
-        This is the entry point of all interaction with your agent after is has been initialised.
+        """
+        The entry point of all interaction with your agent after is has been initialised.
         How to handle the received data is based on its class type.
 
         Args:
@@ -90,8 +92,8 @@ class TemplateAgent(DefaultParty):
             self.domain = self.profile.getDomain()
 
             # -------------------------------------------
-            # Save the list of all possible bids:
-            self.all_bids = AllBidsList(self.domain)
+            # The list of all possible bids:
+            bids = AllBidsList(self.domain)
 
             # Save the reservation value:
             reservation_bid = self.profile.getReservationBid()
@@ -100,9 +102,13 @@ class TemplateAgent(DefaultParty):
             else:
                 self.reservation_value = float(0)
 
-            # Keep only bids with utility that is higher or equal to the reservation value:
-            self.all_bids = list(filter(lambda b: (float(self.profile.getUtility(b)) >= self.reservation_value), self.all_bids))
+            # Consider only the bids above the reservation value,
+            # and precompute their utility which is contained in a tuple list with their respective bid
+            self.all_bids = list(filter(lambda tup: (tup[1] > self.reservation_value), map(lambda b: (b, float(self.profile.getUtility(b))), bids)))
 
+            # Initialize target utility:
+            self.max_possible_utility = max(self.all_bids, key=lambda tup: tup[1])[1]
+            self.target_utility = self.max_possible_utility
             profile_connection.close()
 
         # ActionDone informs you of an action (an offer or an accept)
@@ -133,9 +139,8 @@ class TemplateAgent(DefaultParty):
             self.logger.log(logging.WARNING, "Ignoring unknown info " + str(data))
 
     def getCapabilities(self) -> Capabilities:
-        """MUST BE IMPLEMENTED
+        """
         Method to indicate to the protocol what the capabilities of this agent are.
-        Leave it as is for the ANL 2022 competition
 
         Returns:
             Capabilities: Capabilities representation class
@@ -155,7 +160,7 @@ class TemplateAgent(DefaultParty):
 
     # give a description of your agent
     def getDescription(self) -> str:
-        """MUST BE IMPLEMENTED
+        """TODO: MUST BE IMPLEMENTED
         Returns a description of your agent. 1 or 2 sentences.
 
         Returns:
@@ -222,7 +227,7 @@ class TemplateAgent(DefaultParty):
         progress = self.progress.get(time() * 1000)
 
         bid_utility = float(self.profile.getUtility(bid))
-        upcoming_bid_utility = float(self.profile.getUtility(self.find_bid_of_target_utility()))
+        upcoming_bid_utility = float(self.profile.getUtility(self.find_bid()))
 
         # Accept the offer if *any* of the following conditions are respected:
         conditions = [
@@ -246,12 +251,12 @@ class TemplateAgent(DefaultParty):
         bid_utility = float(self.profile.getUtility(bid))
 
         # Get the max utility in the last W rounds of negotiation:
-
         # [-(self.W + 1):-1] selects the last W+1 elements from the list and ignores the last one (not taking the current received bid into account)
         utilities_in_time_window_W = list(map(lambda b: float(self.profile.getUtility(b)), self.received_bids[-(self.W + 1):-1]))
         max_utility_in_time_window_W = max(utilities_in_time_window_W)
 
         return bid_utility > max_utility_in_time_window_W
+
 
     def find_bid(self) -> Bid:
         progress = self.progress.get(time() * 1000)
@@ -261,23 +266,25 @@ class TemplateAgent(DefaultParty):
         if progress < 0.25:
             return self.find_random_best_bid()
 
-        # If target_utility hasn't been initialized:
-        if self.target_utility is None:
-            self.target_utility = float(self.profile.getUtility(self.last_offered_bid))
+        # Compute the difference in the opponent's utility at each time step (sort of a time series)
+        received_utilities = list(map(lambda b: (float(self.opponent_model.get_predicted_utility(b))), self.received_bids))
+        bid_diffs = [received_utilities[i] - received_utilities[i - 1] for i in range(1, len(received_utilities))]
+
+        # E denotes the concession rate (negative means that we are conceding)
+        # We're trying to mimic the opponent's concession rate, i.e. the average(!) difference in opponent's utility of consecutive offered bids:
+        E: float = sum(bid_diffs)/len(bid_diffs)
+        # If over time the opponent has a positive concession rate (hardliner, pushes for higher gains) then we are going to concede by the amount 1e-04
+        E = min(E, -1e-04)
+
+        min_bid_utility = 0.6  # the minimum bid utility we are willing to consider
+        # Update the target utility:
+        self.target_utility = min([self.max_possible_utility, max([self.target_utility + E, min_bid_utility])])
+        # If we reached the minimum, start again from a target utility of 0.8
+        if self.target_utility == min_bid_utility:
+            self.target_utility = min(self.max_possible_utility, 0.8)
 
         # The most preferable bid based on the opponent model:
-        best_bid = self.find_bid_of_target_utility()
-
-        # Slowly concede if there is no bid or if the bid is the same as the last offered bid:
-        # TODO: change the conceding strategy: best_bid == self.last_offered_bid
-        # TODO: maybe tit for tat? concede if the opponent does (proposed a higher bid than ever: max received utility)
-        if (best_bid is None or best_bid == self.last_offered_bid) and self.target_utility > self.reservation_value:
-            # Decrease the target utility by 0.01:
-            self.target_utility = max(self.target_utility - 0.01, self.reservation_value)
-
-            # If the target utility is acceptable, try again with the changed utility:
-            if self.target_utility > self.reservation_value:
-                return self.find_bid()
+        best_bid = self.find_bid_of_target_utility(self.target_utility)
 
         # Couldn't find best bid:
         if best_bid is None:
@@ -286,7 +293,7 @@ class TemplateAgent(DefaultParty):
         self.last_offered_bid = best_bid
         return best_bid
 
-    def find_random_best_bid(self):
+    def find_random_best_bid(self) -> Bid:
         """
         <Code provided in the original template>
         """
@@ -295,7 +302,7 @@ class TemplateAgent(DefaultParty):
 
         # take 500 attempts to find a bid according to a heuristic score
         for _ in range(500):
-            bid = self.all_bids[randint(0, len(self.all_bids) - 1)]
+            bid = self.all_bids[randint(0, len(self.all_bids) - 1)][0]
             bid_score = self.score_bid(bid)
             if bid_score > best_bid_score:
                 best_bid_score, best_bid = bid_score, bid
@@ -303,17 +310,16 @@ class TemplateAgent(DefaultParty):
         self.last_offered_bid = best_bid
         return best_bid
 
-    def find_bid_of_target_utility(self):
+    def find_bid_of_target_utility(self, target_utility) -> Bid:
         best_bid = None
         best_bid_utility = 0.0
         best_bid_similarity = 0
 
         # Iterate over all possible bids:
-        for bid in self.all_bids:
-            bid_utility = float(self.profile.getUtility(bid))
+        for bid, bid_utility in self.all_bids:
 
             # Consider bids that have utility equal to the aspirational scoring value (or very close to it)
-            if abs(bid_utility-self.target_utility) > 0.05:
+            if bid_utility < target_utility:
                 continue
 
             # Similarity between the bid and the last received bid:
@@ -328,7 +334,7 @@ class TemplateAgent(DefaultParty):
 
         return best_bid
 
-    def similarity(self, bid1, bid2):
+    def similarity(self, bid1, bid2) -> float:
         similarity: float = 0
 
         # Iterate over all issues:
@@ -376,3 +382,4 @@ class TemplateAgent(DefaultParty):
             score += opponent_score
 
         return score
+
