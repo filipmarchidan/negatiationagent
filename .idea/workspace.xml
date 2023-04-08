@@ -4,7 +4,7 @@
     <list default="true" id="8da40af6-574c-4840-9c82-95ff5633cf42" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/agents/template_agent/template_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/agents/template_agent/template_agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/run.py" beforeDir="false" afterPath="$PROJECT_DIR$/run.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/run_tournament.py" beforeDir="false" afterPath="$PROJECT_DIR$/run_tournament.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -29,7 +29,7 @@
     <property name="last_opened_file_path" value="$PROJECT_DIR$" />
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
-  <component name="RunManager" selected="JavaScript Debug.trace_plot.html (3)">
+  <component name="RunManager" selected="Python.run_tournament">
     <configuration name="trace_plot.html (1)" type="JavascriptDebugType" temporary="true" nameIsGenerated="true" uri="http://localhost:63342/negatiationagent/results/20230407-161204/trace_plot.html" useBuiltInWebServerPort="true">
       <method v="2" />
     </configuration>
@@ -37,9 +37,6 @@
       <method v="2" />
     </configuration>
     <configuration name="trace_plot.html (3)" type="JavascriptDebugType" temporary="true" nameIsGenerated="true" uri="http://localhost:63342/negatiationagent/results/20230407-161957/trace_plot.html" useBuiltInWebServerPort="true">
-      <method v="2" />
-    </configuration>
-    <configuration name="trace_plot.html" type="JavascriptDebugType" temporary="true" nameIsGenerated="true" uri="http://localhost:63342/negatiationagent/results/20230407-160719/trace_plot.html" useBuiltInWebServerPort="true">
       <method v="2" />
     </configuration>
     <configuration name="run" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
@@ -64,13 +61,35 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="run_tournament" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="C:\Users\march\AppData\Local\Programs\Python\Python39\python.exe" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <module name="" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/run_tournament.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.run_tournament" />
         <item itemvalue="JavaScript Debug.trace_plot.html (3)" />
         <item itemvalue="Python.run" />
         <item itemvalue="JavaScript Debug.trace_plot.html (2)" />
         <item itemvalue="JavaScript Debug.trace_plot.html (1)" />
-        <item itemvalue="JavaScript Debug.trace_plot.html" />
       </list>
     </recent_temporary>
   </component>
@@ -84,7 +103,8 @@
       <updated>1680615356172</updated>
       <workItem from="1680615359024" duration="2287000" />
       <workItem from="1680702634470" duration="4327000" />
-      <workItem from="1680869059073" duration="4350000" />
+      <workItem from="1680869059073" duration="4873000" />
+      <workItem from="1680957920369" duration="799000" />
     </task>
     <servers />
   </component>
@@ -95,6 +115,7 @@
     <option featureType="com.intellij.fileTypeFactory" implementationName="requirements.txt" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/negatiationagent$run.coverage" NAME="run Coverage Results" MODIFIED="1680873422067" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/negatiationagent$run.coverage" NAME="run Coverage Results" MODIFIED="1680873596155" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/negatiationagent$run_tournament.coverage" NAME="run_tournament Coverage Results" MODIFIED="1680958100205" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

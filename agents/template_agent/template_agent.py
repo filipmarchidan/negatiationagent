@@ -271,7 +271,7 @@ class TemplateAgent(DefaultParty):
 
             # TODO change equation if needed
         #print(self.profile.getUtility(bid), "bid utility")
-        print(self.reservation_value, "reservation value")
+        #print(self.reservation_value, "reservation value")
         return (self.profile.getUtility(bid) > self.reservation_value) and (
             (self.accept_time() or (self.accept_max(bid))) or self.accept_previous(bid) and self.accept_next(bid))
 
