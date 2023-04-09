@@ -25,8 +25,8 @@ if not run_tournament:
                 "parameters": {"storage_dir": "agent_storage/DreamTeam109Agent"},
             },
             {
-                "class": "agents.template_agent.template_agent.TemplateAgent",
-                "parameters": {"storage_dir": "agent_storage/TemplateAgent"},
+                "class": "agents.agent_group34.agent_group34.AgentGroup34",
+                "parameters": {"storage_dir": "agent_storage/AgentGroup34"},
             },
         ],
         "profiles": ["domains/domain00/profileA.json", "domains/domain00/profileB.json"],
@@ -145,8 +145,8 @@ else:
     ]
 
     template_agent = {
-        "class": "agents.template_agent.template_agent.TemplateAgent",
-        "parameters": {"storage_dir": "agent_storage/TemplateAgent"},
+        "class": "agents.agent_group34.agent_group34.AgentGroup34",
+        "parameters": {"storage_dir": "agent_storage/AgentGroup34"},
     }
 
     for agent in agents:
