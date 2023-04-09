@@ -157,7 +157,6 @@ class AgentGroup34(DefaultParty):
         """
         self.getConnection().send(action)
 
-    # give a description of your agent
     def getDescription(self) -> str:
         """
         Returns a description of your agent. 1 or 2 sentences.
