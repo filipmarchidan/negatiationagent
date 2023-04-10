@@ -90,7 +90,7 @@ class TemplateAgent(DefaultParty):
             if reservation_bid is not None:
                 self.reservation_value = float(self.profile.getUtility(reservation_bid))
             else:
-                self.reservation_value = float(0)
+                self.reservation_value = float(0.4)
 
             domain = self.profile.getDomain()
             all_bids = AllBidsList(domain)
